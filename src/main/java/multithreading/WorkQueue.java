@@ -4,20 +4,10 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 import org.apache.log4j.Logger;
 
-//
-// class WorkQueue
-// Main loop of this application adds to this queue HealthViewRunnables according to the schedule.
-// HealthViewRunnable includes HealthViewTask and e.g. MMLTaskImpl is implementation of
-// HealthViewTask.
-// WorkQueue has pool workers (Thread extensions) which take HealthViewRunnables from queue, one at
-// a time,
-// and start them.
-// There come also requests via SimpleHTTPServer to start e.g. MML operations.
-//
 class WorkQueue {
   private static final int nThreads = 20;
   private final PoolWorker[] threads;
-  private final LinkedList<HealthViewRunnable> queue;
+  private final LinkedList<TaskRunnable> queue;
   private final LinkedList<String> ongoingTasks;
 
   private static final WorkQueue INSTANCE = new WorkQueue();
@@ -28,7 +18,7 @@ class WorkQueue {
   }
 
   private WorkQueue() {
-    queue = new LinkedList<HealthViewRunnable>();
+    queue = new LinkedList<TaskRunnable>();
     threads = new PoolWorker[nThreads];
     ongoingTasks = new LinkedList<String>();
 
@@ -39,14 +29,14 @@ class WorkQueue {
     }
   }
 
-  public void execute(HealthViewRunnable r) {
+  public void execute(TaskRunnable r) {
     boolean added = true;
 
     synchronized (queue) {
       boolean alreadyInQueue = false;
 
       // checking whether exists already in queue
-      for (HealthViewRunnable hvRunnable : queue) {
+      for (TaskRunnable hvRunnable : queue) {
         if (r.getTask().getInfo().compareTo(hvRunnable.getTask().getInfo()) == 0) {
           alreadyInQueue = true;
           break;
@@ -70,7 +60,7 @@ class WorkQueue {
     }
     int size = queue.size();
 
-    HealthViewRunnable runnable = r;
+    TaskRunnable runnable = r;
     if (added) {
       LOG.debug(new StringBuilder().append("new bg task added to queue (")
           .append(runnable.getTask().getInfo()).append("), size of queue = ").append(size));
@@ -80,11 +70,11 @@ class WorkQueue {
     }
   }
 
-  public boolean isTaskOngoing(HealthViewRunnable r) {
+  public boolean isTaskOngoing(TaskRunnable r) {
     synchronized (queue) {
       boolean existsInQueue = false;
 
-      for (HealthViewRunnable hvRunnable : queue) {
+      for (TaskRunnable hvRunnable : queue) {
         if (r.getTask().getInfo().compareTo(hvRunnable.getTask().getInfo()) == 0) {
           existsInQueue = true;
           LOG.debug("task exists in queue: " + r.getTask().getInfo());
@@ -136,7 +126,7 @@ class WorkQueue {
 
     @Override
     public void run() {
-      HealthViewRunnable r;
+      TaskRunnable r;
 
       while (true) {
         synchronized (queue) {
